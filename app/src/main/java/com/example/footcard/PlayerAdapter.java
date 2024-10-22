@@ -21,6 +21,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
+import retrofit2.Call;
+
 public class PlayerAdapter extends RecyclerView.Adapter<PlayerAdapter.PlayerViewHolder> {
 
     List<Player> playerList;
@@ -39,10 +41,9 @@ public class PlayerAdapter extends RecyclerView.Adapter<PlayerAdapter.PlayerView
 
     // Method to add new players to the list
     public void addPlayers(List<Player> newPlayers) {
-        Log.d("PlayerAdapter", "Setting new players list");
-        int startPosition = playerList.size();  // Get current size
+        //int startPosition = playerList.size();  // Get current size
         playerList.addAll(newPlayers);          // Add new players to the list
-        notifyItemRangeInserted(startPosition, newPlayers.size());  // Notify the adapter
+        notifyItemInserted(playerList.size() - 1);  // Notify the adapter
     }
 
     @NonNull
@@ -70,6 +71,7 @@ public class PlayerAdapter extends RecyclerView.Adapter<PlayerAdapter.PlayerView
 
     @Override
     public int getItemCount() {
+        System.out.println("yes : " + playerList.size());
         return playerList.size();
     }
 

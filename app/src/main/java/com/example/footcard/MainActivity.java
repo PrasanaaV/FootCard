@@ -1,6 +1,7 @@
 package com.example.footcard;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -15,113 +16,101 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
+import androidx.appcompat.widget.SearchView;
 import java.util.ArrayList;
 import java.util.List;
 
-import androidx.appcompat.widget.SearchView;
-
 public class MainActivity extends AppCompatActivity {
 
+    // example
+    private int userId = 3;
     private static final String BASE_URL = "http://10.0.2.2:8080/";
-    private static final String BEARER_TOKEN = "eyJhbGciOiJIUzM4NCJ9.eyJpYXQiOjE3Mjk2MDY2ODIsImV4cCI6MTcyOTYyMTA4Miwic3ViIjoiMyIsInJvbGUiOiJVU0VSIn0.MCpGYondYFnrHAH5JmtaehbOvt8t6JcQ3vDogBhLtta0V0qOrSyG9KoxOHUCuI7y";
+    private static final String BEARER_TOKEN = "eyJhbGciOiJIUzM4NCJ9.eyJpYXQiOjE3Mjk2MTU1NzIsImV4cCI6MTcyOTYyOTk3Miwic3ViIjoiMyIsInJvbGUiOiJVU0VSIn0.sB5jJxdJEdflcEjVeYiDWBYR035hQOZagl8Kv4HCFPEfItoTw3iI0ZvGRez2Yy6M";
     private RecyclerView recyclerView;
     private PlayerAdapter playerAdapter;
     private PlayerApi playerApi;
-    private AuthApi authApi; // For sign-out API call
+    private AuthApi authApi;
+    private int currentTabId = R.id.nav_all_players; // initial tab
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Initialize RecyclerView
         recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new GridLayoutManager(this, 3));
-
-        // Initialize PlayerAdapter with an empty list
         playerAdapter = new PlayerAdapter(new ArrayList<>());
         recyclerView.setAdapter(playerAdapter);
 
-        // Initialize SearchView
         SearchView searchView = findViewById(R.id.searchView);
 
-        // Create OkHttpClient with AuthInterceptor for Bearer token
         OkHttpClient okHttpClient = new OkHttpClient.Builder()
                 .addInterceptor(new AuthInterceptor(BEARER_TOKEN))
                 .build();
 
-        // Build Retrofit
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(BASE_URL)
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(okHttpClient)
                 .build();
 
-        // Create PlayerApi
         playerApi = retrofit.create(PlayerApi.class);
-
-        // Create AuthApi for logout
         authApi = retrofit.create(AuthApi.class);
-
-        // Handle initial load of players (for the user by default)
-        loadPlayers(3, 0); // Start with page 0 for user with ID 3
 
         BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
         bottomNavigationView.setOnItemSelectedListener(item -> {
-            playerAdapter.setPlayers(new ArrayList<>()); // Clear the list before loading new data
+            currentTabId = item.getItemId();
             switch (item.getItemId()) {
                 case R.id.nav_all_players:
-                    loadAllPlayers(0); // Load all players starting from page 0
+                    loadAllPlayers(0);
                     return true;
-
                 case R.id.nav_user_players:
-                    loadPlayers(3, 0); // Load players for the current user (user ID 3)
+                    loadPlayers(userId, 0);
                     return true;
-
                 case R.id.nav_logout:
-                    signOut(); // Handle user logout
+                    signOut();
                     return true;
             }
             return false;
         });
 
-        // Setup SearchView listeners
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
-                searchPlayersForUser(3, query, 0); // Reset search with page 0 for user 3
-                return false;
+                searchPlayersForUser(userId, query, 0);
+                return true;
             }
 
             @Override
             public boolean onQueryTextChange(String newText) {
                 if (newText.isEmpty()) {
-                    loadPlayers(3, 0); // Load default players if the search is cleared
+                    loadPlayers(userId, 0);
                 } else {
-                    searchPlayersForUser(3, newText, 0); // Reset search with page 0 for user 3
+                    searchPlayersForUser(userId, newText, 0);
                 }
-                return false;
+                return true;
             }
         });
+        loadAllPlayers(0);
     }
 
-    // Load all players from the general endpoint with pagination
+
     private void loadAllPlayers(int page) {
-        Call<PlayerResponse> call = playerApi.getAllPlayers(page, 20);
-        call.enqueue(new Callback<PlayerResponse>() {
+        playerApi.getAllPlayers(page, 30).enqueue(new Callback<PlayerResponse>() {
             @Override
             public void onResponse(Call<PlayerResponse> call, Response<PlayerResponse> response) {
+                if (currentTabId != R.id.nav_all_players) {
+                    Log.d("MainActivity", "Ignoring all players load for inactive tab");
+                    return;
+                }
                 if (response.isSuccessful() && response.body() != null) {
                     List<Player> players = response.body().getContent();
                     if (page == 0) {
-                        playerAdapter.setPlayers(players); // Reset adapter with all players
+                        playerAdapter.setPlayers(players);
                     } else {
-                        playerAdapter.addPlayers(players); // Add more players to the existing list
+                        playerAdapter.addPlayers(players);
                     }
-
-                    // Check if there are more pages to load
                     if (page < response.body().getPage().getTotalPages() - 1) {
-                        // Load the next page recursively
                         loadAllPlayers(page + 1);
                     }
                 } else {
@@ -131,29 +120,29 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<PlayerResponse> call, Throwable t) {
+                if (currentTabId != R.id.nav_all_players) {
+                    Log.d("MainActivity", "Ignoring failure for inactive tab");
+                    return;
+                }
                 Toast.makeText(MainActivity.this, "Error fetching players", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    // Load players for a specific user with pagination
     private void loadPlayers(int userId, int page) {
-        Call<PlayerResponse> call = playerApi.getPlayers(userId, page, 20);
-        call.enqueue(new Callback<PlayerResponse>() {
+        playerApi.getPlayers(userId, page, 30).enqueue(new Callback<PlayerResponse>() {
             @Override
             public void onResponse(Call<PlayerResponse> call, Response<PlayerResponse> response) {
+                if (currentTabId != R.id.nav_user_players) {
+                    Log.d("MainActivity", "Ignoring user players load for inactive tab");
+                    return;
+                }
                 if (response.isSuccessful() && response.body() != null) {
                     List<Player> players = response.body().getContent();
                     if (page == 0) {
-                        playerAdapter.setPlayers(players); // Reset adapter with user players
+                        playerAdapter.setPlayers(players);
                     } else {
-                        playerAdapter.addPlayers(players); // Add more players to the existing list
-                    }
-
-                    // Check if there are more pages to load
-                    if (page < response.body().getPage().getTotalPages() - 1) {
-                        // Load the next page recursively
-                        loadPlayers(userId, page + 1);
+                        playerAdapter.addPlayers(players);
                     }
                 } else {
                     Toast.makeText(MainActivity.this, "Failed to retrieve players", Toast.LENGTH_SHORT).show();
@@ -162,7 +151,42 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<PlayerResponse> call, Throwable t) {
+                if (currentTabId != R.id.nav_user_players) {
+                    Log.d("MainActivity", "Ignoring failure for inactive tab");
+                    return;
+                }
                 Toast.makeText(MainActivity.this, "Error fetching players", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void searchPlayersForUser(int userId, String searchTerm, int page) {
+        playerApi.searchPlayersForUser(userId, searchTerm, page).enqueue(new Callback<PlayerResponse>() {
+            @Override
+            public void onResponse(Call<PlayerResponse> call, Response<PlayerResponse> response) {
+                if (currentTabId != R.id.nav_user_players) {
+                    Log.d("MainActivity", "Ignoring search result for inactive tab");
+                    return;
+                }
+                if (response.isSuccessful() && response.body() != null) {
+                    List<Player> players = response.body().getContent();
+                    if (page == 0) {
+                        playerAdapter.setPlayers(players);
+                    } else {
+                        playerAdapter.addPlayers(players);
+                    }
+                } else {
+                    Toast.makeText(MainActivity.this, "No players found", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<PlayerResponse> call, Throwable t) {
+                if (currentTabId != R.id.nav_user_players) {
+                    Log.d("MainActivity", "Ignoring search failure for inactive tab");
+                    return;
+                }
+                Toast.makeText(MainActivity.this, "Error searching players", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -183,39 +207,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onFailure(Call<Void> call, Throwable t) {
                 Toast.makeText(MainActivity.this, "Error logging out", Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void searchPlayersForUser(int userId, String searchTerm, int page) {
-        Call<PlayerResponse> call = playerApi.searchPlayersForUser(userId, searchTerm, page);
-        call.enqueue(new Callback<PlayerResponse>() {
-            @Override
-            public void onResponse(Call<PlayerResponse> call, Response<PlayerResponse> response) {
-                if (response.isSuccessful() && response.body() != null) {
-                    List<Player> players = response.body().getContent();
-
-                    if (page == 0) {
-                        // Reset adapter with the new search results
-                        playerAdapter.setPlayers(players);
-                    } else {
-                        // Add new players to the existing adapter list
-                        playerAdapter.addPlayers(players);
-                    }
-
-                    // Check if there are more pages to load
-                    if (page < response.body().getPage().getTotalPages() - 1) {
-                        // Load the next page recursively
-                        searchPlayersForUser(userId, searchTerm, page + 1);
-                    }
-                } else {
-                    Toast.makeText(MainActivity.this, "No players found", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<PlayerResponse> call, Throwable t) {
-                Toast.makeText(MainActivity.this, "Error searching players", Toast.LENGTH_SHORT).show();
             }
         });
     }
