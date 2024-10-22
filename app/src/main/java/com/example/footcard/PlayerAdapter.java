@@ -30,6 +30,20 @@ public class PlayerAdapter extends RecyclerView.Adapter<PlayerAdapter.PlayerView
         this.playerList = playerList;
     }
 
+    // Method to reset the player list and notify the adapter
+    public void setPlayers(List<Player> newPlayers) {
+        this.playerList.clear();  // Clear the existing players
+        this.playerList.addAll(newPlayers);  // Add the new players
+        notifyDataSetChanged();  // Notify the adapter to refresh the UI
+    }
+
+    // Method to add new players to the list
+    public void addPlayers(List<Player> newPlayers) {
+        int startPosition = playerList.size();  // Get current size
+        playerList.addAll(newPlayers);          // Add new players to the list
+        notifyItemRangeInserted(startPosition, newPlayers.size());  // Notify the adapter
+    }
+
     @NonNull
     @Override
     public PlayerViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -47,13 +61,10 @@ public class PlayerAdapter extends RecyclerView.Adapter<PlayerAdapter.PlayerView
         holder.playerPosition.setText(player.getPosition());
 
         // Load images using Glide with error handling
-        System.out.println(player.getLeagueImageUrl());
-        System.out.println(player.getNationalityImageUrl());
         loadPlayerImage(holder.playerImage, baseUrl + player.getImageUrl());
         loadPlayerImage(holder.leagueImage, baseUrl + player.getLeagueImageUrl());
         loadPlayerImage(holder.teamImage, baseUrl + player.getTeamImageUrl());
         loadPlayerImage(holder.nationalityImage, baseUrl + player.getNationalityImageUrl());
-
     }
 
     @Override
@@ -80,7 +91,7 @@ public class PlayerAdapter extends RecyclerView.Adapter<PlayerAdapter.PlayerView
     }
 
     public static class PlayerViewHolder extends RecyclerView.ViewHolder {
-        public TextView playerName, playerPosition, playerTeam, playerLeague, playerNationality;
+        public TextView playerName, playerPosition;
         public ImageView playerImage, leagueImage, teamImage, nationalityImage;
 
         public PlayerViewHolder(@NonNull View itemView) {
@@ -93,7 +104,6 @@ public class PlayerAdapter extends RecyclerView.Adapter<PlayerAdapter.PlayerView
             leagueImage = itemView.findViewById(R.id.leagueImage);
             teamImage = itemView.findViewById(R.id.teamImage);
             nationalityImage = itemView.findViewById(R.id.nationalityImage);
-            System.out.println(nationalityImage);
         }
     }
 }
