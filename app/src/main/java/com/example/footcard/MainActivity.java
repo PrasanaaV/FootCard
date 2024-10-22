@@ -1,6 +1,5 @@
 package com.example.footcard;
 
-import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
@@ -24,7 +23,7 @@ import androidx.appcompat.widget.SearchView;
 public class MainActivity extends AppCompatActivity {
 
     private static final String BASE_URL = "http://10.0.2.2:8080/";
-    private static final String BEARER_TOKEN = "eyJhbGciOiJIUzM4NCJ9.eyJpYXQiOjE3Mjk2MDMzNTgsImV4cCI6MTcyOTYxNzc1OCwic3ViIjoiMyIsInJvbGUiOiJVU0VSIn0.sabJQDjTwr3uykdl6c47zj4f531zs6GRugL00L_L6Ymf7cWRwOBSlQbPvDKYsgyl";
+    private static final String BEARER_TOKEN = "eyJhbGciOiJIUzM4NCJ9.eyJpYXQiOjE3Mjk2MDY2ODIsImV4cCI6MTcyOTYyMTA4Miwic3ViIjoiMyIsInJvbGUiOiJVU0VSIn0.MCpGYondYFnrHAH5JmtaehbOvt8t6JcQ3vDogBhLtta0V0qOrSyG9KoxOHUCuI7y";
     private RecyclerView recyclerView;
     private PlayerAdapter playerAdapter;
     private PlayerApi playerApi;
@@ -68,7 +67,8 @@ public class MainActivity extends AppCompatActivity {
         loadPlayers(3, 0); // Start with page 0 for user with ID 3
 
         BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
-        bottomNavigationView.setOnNavigationItemSelectedListener(item -> {
+        bottomNavigationView.setOnItemSelectedListener(item -> {
+            playerAdapter.setPlayers(new ArrayList<>()); // Clear the list before loading new data
             switch (item.getItemId()) {
                 case R.id.nav_all_players:
                     loadAllPlayers(0); // Load all players starting from page 0
@@ -84,7 +84,6 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
-
 
         // Setup SearchView listeners
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
@@ -106,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    // Load all players from the general endpoint
+    // Load all players from the general endpoint with pagination
     private void loadAllPlayers(int page) {
         Call<PlayerResponse> call = playerApi.getAllPlayers(page, 20);
         call.enqueue(new Callback<PlayerResponse>() {
@@ -114,7 +113,17 @@ public class MainActivity extends AppCompatActivity {
             public void onResponse(Call<PlayerResponse> call, Response<PlayerResponse> response) {
                 if (response.isSuccessful() && response.body() != null) {
                     List<Player> players = response.body().getContent();
-                    playerAdapter.setPlayers(players); // Reset adapter with all players
+                    if (page == 0) {
+                        playerAdapter.setPlayers(players); // Reset adapter with all players
+                    } else {
+                        playerAdapter.addPlayers(players); // Add more players to the existing list
+                    }
+
+                    // Check if there are more pages to load
+                    if (page < response.body().getPage().getTotalPages() - 1) {
+                        // Load the next page recursively
+                        loadAllPlayers(page + 1);
+                    }
                 } else {
                     Toast.makeText(MainActivity.this, "Failed to retrieve players", Toast.LENGTH_SHORT).show();
                 }
@@ -127,6 +136,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    // Load players for a specific user with pagination
     private void loadPlayers(int userId, int page) {
         Call<PlayerResponse> call = playerApi.getPlayers(userId, page, 20);
         call.enqueue(new Callback<PlayerResponse>() {
@@ -134,7 +144,17 @@ public class MainActivity extends AppCompatActivity {
             public void onResponse(Call<PlayerResponse> call, Response<PlayerResponse> response) {
                 if (response.isSuccessful() && response.body() != null) {
                     List<Player> players = response.body().getContent();
-                    playerAdapter.setPlayers(players); // Reset adapter with user players
+                    if (page == 0) {
+                        playerAdapter.setPlayers(players); // Reset adapter with user players
+                    } else {
+                        playerAdapter.addPlayers(players); // Add more players to the existing list
+                    }
+
+                    // Check if there are more pages to load
+                    if (page < response.body().getPage().getTotalPages() - 1) {
+                        // Load the next page recursively
+                        loadPlayers(userId, page + 1);
+                    }
                 } else {
                     Toast.makeText(MainActivity.this, "Failed to retrieve players", Toast.LENGTH_SHORT).show();
                 }

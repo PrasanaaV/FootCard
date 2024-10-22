@@ -23,7 +23,7 @@ import java.util.List;
 
 public class PlayerAdapter extends RecyclerView.Adapter<PlayerAdapter.PlayerViewHolder> {
 
-    private List<Player> playerList;
+    List<Player> playerList;
     private String baseUrl = "http://10.0.2.2:8080";  // Update this as needed for production
 
     public PlayerAdapter(List<Player> playerList) {
@@ -39,6 +39,7 @@ public class PlayerAdapter extends RecyclerView.Adapter<PlayerAdapter.PlayerView
 
     // Method to add new players to the list
     public void addPlayers(List<Player> newPlayers) {
+        Log.d("PlayerAdapter", "Setting new players list");
         int startPosition = playerList.size();  // Get current size
         playerList.addAll(newPlayers);          // Add new players to the list
         notifyItemRangeInserted(startPosition, newPlayers.size());  // Notify the adapter
