@@ -1,7 +1,9 @@
 package com.example.footcard;
 
 import android.annotation.SuppressLint;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -148,24 +150,53 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void signOut() {
-        Call<Void> call = authApi.signOut();
-        call.enqueue(new Callback<Void>() {
-            @Override
-            public void onResponse(Call<Void> call, Response<Void> response) {
-                if (response.isSuccessful()) {
-                    Toast.makeText(MainActivity.this, "Successfully logged out", Toast.LENGTH_SHORT).show();
-                    finish(); // Close the activity and log out the user
-                } else {
-                    Toast.makeText(MainActivity.this, "Failed to log out", Toast.LENGTH_SHORT).show();
-                }
-            }
+        SharedPreferences sharedPreferences = getSharedPreferences("auth_prefs", MODE_PRIVATE);
+        String accessToken = sharedPreferences.getString("access_token", null);
 
-            @Override
-            public void onFailure(Call<Void> call, Throwable t) {
-                Toast.makeText(MainActivity.this, "Error logging out", Toast.LENGTH_SHORT).show();
-            }
-        });
+        if (accessToken != null) {
+            // Préfixer le token avec "Bearer "
+            String bearerToken = "Bearer " + accessToken;
+
+            // Appel à l'API pour se déconnecter avec le token dans l'en-tête Authorization
+            Call<Void> call = authApi.signOut(bearerToken);
+            call.enqueue(new Callback<Void>() {
+                @Override
+                public void onResponse(Call<Void> call, Response<Void> response) {
+                    if (response.isSuccessful()) {
+                        // Supprimer les tokens du SharedPreferences
+                        clearTokensFromStorage();
+
+                        Toast.makeText(MainActivity.this, "Successfully logged out", Toast.LENGTH_SHORT).show();
+                        finish(); // Ferme l'activité et déconnecte l'utilisateur
+                    } else {
+                        Log.e("error", response.body().toString());
+                        Toast.makeText(MainActivity.this, "Failed to log out", Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<Void> call, Throwable t) {
+                    Toast.makeText(MainActivity.this, "Error logging out", Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            Toast.makeText(MainActivity.this, "No access token found", Toast.LENGTH_SHORT).show();
+        }
     }
+
+    private void clearTokensFromStorage() {
+        SharedPreferences sharedPreferences = getSharedPreferences("auth_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+
+        // Supprimer les tokens du stockage
+        editor.remove("access_token");
+        editor.remove("refresh_token");
+
+        // Appliquer les changements
+        editor.apply();
+    }
+
+
 
     private void searchPlayersForUser(int userId, String searchTerm, int page) {
         Call<PlayerResponse> call = playerApi.searchPlayersForUser(userId, searchTerm, page);

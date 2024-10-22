@@ -1,3 +1,25 @@
 <resources>
     <string name="app_name">FootCard</string>
+    <string name="login_title">Login !</string>
+    <string name="signup_title">Signup !</string>
+    <string name="reset_password_title">Reset password !</string>
+    <string name="confirm_password_title">Confirm password !</string>
+    <string name="activation_title">Activation control !</string>
+    <string name="home_title">Home</string>
+    <string name="username_hint">Username</string>
+    <string name="email_hint">Email</string>
+    <string name="password_hint">Password</string>
+    <string name="new_password">New Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="forgot_password">Forgot password ?</string>
+    <string name="login_button">Login</string>
+    <string name="signup_button">Signup</string>
+    <string name="activate_button">Activate</string>
+    <string name="logout_button">Logout</string>
+    <string name="reset_password_button">Reset</string>
+    <string name="confirm_password_button">Confirm</string>
+    <string name="create_account_prompt">You do not have an account ? Create one !</string>
+    <string name="account_already_created">Already have an account ? Login</string>
+    <string name="code">Enter activation code</string>
+    <string name="resend_code_button">Resend</string>
 </resources>
