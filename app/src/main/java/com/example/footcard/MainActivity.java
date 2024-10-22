@@ -1,12 +1,22 @@
 package com.example.footcard;
 
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import okhttp3.OkHttpClient;
@@ -17,6 +27,9 @@ import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 import androidx.appcompat.widget.SearchView;
+
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,7 +55,11 @@ public class MainActivity extends AppCompatActivity {
         playerAdapter = new PlayerAdapter(new ArrayList<>());
         recyclerView.setAdapter(playerAdapter);
 
-        SearchView searchView = findViewById(R.id.searchView);
+        SearchView searchViewAllPlayers = findViewById(R.id.searchViewAllPlayers);
+        SearchView searchViewMyPlayers = findViewById(R.id.searchViewMyPlayers);
+
+        searchViewAllPlayers.setVisibility(View.GONE);  // Commencez par cacher une des deux
+        searchViewMyPlayers.setVisibility(View.VISIBLE);
 
         OkHttpClient okHttpClient = new OkHttpClient.Builder()
                 .addInterceptor(new AuthInterceptor(BEARER_TOKEN))
@@ -65,6 +82,7 @@ public class MainActivity extends AppCompatActivity {
                     loadAllPlayers(0);
                     return true;
                 case R.id.nav_user_players:
+                    fetchAndDisplayDailyPlayer();
                     loadPlayers(userId, 0);
                     return true;
                 case R.id.nav_logout:
@@ -74,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
 
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+        searchViewMyPlayers.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
                 searchPlayersForUser(userId, query, 0);
@@ -91,7 +109,33 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
+
+        searchViewAllPlayers.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                if (currentTabId == R.id.nav_all_players) { // Assurez-vous que l'onglet All Players est actif
+                    searchAllPlayers(query, 0);
+                }
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                if (currentTabId == R.id.nav_all_players) { // Idem pour la modification du texte
+                    if (newText.isEmpty()) {
+                        loadAllPlayers(0);
+                    } else {
+                        searchAllPlayers(newText, 0);
+                    }
+                }
+                return true;
+            }
+        });
+
+
         loadAllPlayers(0);
+
+
     }
 
 
@@ -165,7 +209,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(Call<PlayerResponse> call, Response<PlayerResponse> response) {
                 if (currentTabId != R.id.nav_user_players) {
-                    Log.d("MainActivity", "Ignoring search result for inactive tab");
                     return;
                 }
                 if (response.isSuccessful() && response.body() != null) {
@@ -191,6 +234,29 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void searchAllPlayers(String searchTerm, int page) {
+        playerApi.searchPlayers(searchTerm, page).enqueue(new Callback<PlayerResponse>() {
+            @Override
+            public void onResponse(Call<PlayerResponse> call, Response<PlayerResponse> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    List<Player> players = response.body().getContent();
+                    if (page == 0) {
+                        playerAdapter.setPlayers(players);
+                    } else {
+                        playerAdapter.addPlayers(players);
+                    }
+                } else {
+                    Toast.makeText(MainActivity.this, "No players found", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<PlayerResponse> call, Throwable t) {
+                Toast.makeText(MainActivity.this, "Error during search", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     private void signOut() {
         Call<Void> call = authApi.signOut();
         call.enqueue(new Callback<Void>() {
@@ -210,4 +276,52 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+    private void fetchAndDisplayDailyPlayer() {
+        Call<Player> call = playerApi.getDailyPlayer();
+        call.enqueue(new Callback<Player>() {
+            @Override
+            public void onResponse(Call<Player> call, Response<Player> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    updateDailyPlayerUI(response.body());
+                } else {
+                    Toast.makeText(MainActivity.this, "No daily player yet", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Player> call, Throwable t) {
+                Toast.makeText(MainActivity.this, "Error fetching daily player", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void loadPlayerImage(ImageView imageView, String imageUrl) {
+        Glide.with(this)
+                .load(imageUrl)
+                .listener(new RequestListener<Drawable>() {
+                    @Override
+                    public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
+                        Log.e("MainActivity", "Image load failed for url: " + imageUrl, e);
+                        return false;
+                    }
+
+                    public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                        return false;
+                    }
+                })
+                .into(imageView);
+    }
+
+    private void updateDailyPlayerUI(Player player) {
+        TextView dailyPlayerName = findViewById(R.id.dailyPlayerName);
+        TextView dailyPlayerPosition = findViewById(R.id.dailyPlayerPosition);
+        ImageView dailyPlayerImage = findViewById(R.id.dailyPlayerImage);
+
+        dailyPlayerName.setText(player.getName());
+        dailyPlayerPosition.setText(player.getPosition());
+
+        // Load the player image
+        loadPlayerImage(dailyPlayerImage, BASE_URL + player.getImageUrl());
+    }
+
 }

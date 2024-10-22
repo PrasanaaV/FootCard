@@ -27,5 +27,7 @@ public interface PlayerApi {
     @GET("api/players")
     Call<PlayerResponse> getAllPlayers(@Query("page") int page, @Query("size") int size);
 
+    @GET("api/players/daily")
+    Call<Player> getDailyPlayer();
 
 }
