@@ -2,9 +2,12 @@ diff --git a/ios/chrome/browser/shared/public/features/features.h b/ios/chrome/b
 index 64034d00..d3216d3 100644
 --- a/ios/chrome/browser/shared/public/features/features.h
 +++ b/ios/chrome/browser/shared/public/features/features.h
-@@ -1046,8 +1046,8 @@ BASE_DECLARE_FEATURE(kFullscreenTransition);
+@@ -1043,9 +1043,9 @@ BASE_DECLARE_FEATURE(kAutofillUseTwoBoxForAddressSuggestions);
+ #endif  //  IOS_CHROME_BROWSER_AUTOFILL_ADDRESS_AUTOFILL_ADDRESSES_DELEGATE_H_
+
+ BASE_DECLARE_FEATURE(kFullscreenTransition);
  BASE_DECLARE_FEATURE(kRefactorToolbarUI);
- 
+
 -bool RefactorToolbarUIEnabled();
 +bool IsRefactorToolbarUIEnabled();
 
@@ -13,12 +16,16 @@ diff --git a/ios/chrome/browser/shared/public/features/features.mm b/ios/chrome/
 index 97df53d..82a6797 100644
 --- a/ios/chrome/browser/shared/public/features/features.mm
 +++ b/ios/chrome/browser/shared/public/features/features.mm
-@@ -1270,7 +1270,7 @@ BASE_FEATURE(kFullscreenTransition,
+@@ -1267,11 +1267,10 @@ BASE_FEATURE(kNewTabRenovationsIPH,
+              base::FEATURE_DISABLED_BY_DEFAULT);
+
+ BASE_FEATURE(kFullscreenTransition,
+              "FullscreenTransition",
               base::FEATURE_DISABLED_BY_DEFAULT);
  BASE_FEATURE(kRefactorToolbarUI,
               "RefactorToolbarUI",
 -             base::FEATURE_DISABLED_BY_DEFAULT);
--
+
 -bool RefactorToolbarUIEnabled() {
 +             base::FEATURE_DISABLED_BY_DEFAULT);
 
@@ -29,7 +36,7 @@ diff --git a/ios/chrome/browser/browser_view/ui_bundled/browser_view_controller.
 index b84b213..fefcc287 100644
 --- a/ios/chrome/browser/browser_view/ui_bundled/browser_view_controller.mm
 +++ b/ios/chrome/browser/browser_view/ui_bundled/browser_view_controller.mm
-@@ -1988,15 +1988,15 @@ - (void)updateToolbarState {
+@@ -1985,14 +1985,14 @@ - (void)viewWillAppear:(BOOL)animated {
  // Updates the ToolbarUIState, which broadcasts any changes to registered
  // listeners.
  - (void)updateToolbarState {
@@ -46,39 +53,40 @@ index b84b213..fefcc287 100644
      self.fullscreenController->setToolbarUIState(_toolbarUIState);
      return;
    }
- 
 diff --git a/ios/chrome/browser/contextual_panel/coordinator/panel_content_coordinator.mm b/ios/chrome/browser/contextual_panel/coordinator/panel_content_coordinator.mm
 index 82b7cd8..17f3a1f 100644
 --- a/ios/chrome/browser/contextual_panel/coordinator/panel_content_coordinator.mm
 +++ b/ios/chrome/browser/contextual_panel/coordinator/panel_content_coordinator.mm
-@@ -57,7 +57,7 @@ - (void)start {
+@@ -54,8 +54,8 @@ - (void)start {
    ChromeBroadcaster* broadcaster =
        FullscreenController::FromBrowser(self.browser)->broadcaster();
- 
+
 -  _mediator = [[PanelContentMediator alloc] initWithBroadcaster:broadcaster
 -                                         initWithToolbarUIState:toolbarUIState];
 +  _mediator = [[PanelContentMediator alloc] initWithBroadcaster:broadcaster
 +                                                toolbarUIState:toolbarUIState];
    _mediator.consumer = _viewController;
- 
+
+   _modulators = [[NSMutableArray alloc] init];
 diff --git a/ios/chrome/browser/contextual_panel/coordinator/panel_content_mediator.h b/ios/chrome/browser/contextual_panel/coordinator/panel_content_mediator.h
 index 7cc12e0..580a113 100644
 --- a/ios/chrome/browser/contextual_panel/coordinator/panel_content_mediator.h
 +++ b/ios/chrome/browser/contextual_panel/coordinator/panel_content_mediator.h
-@@ -14,7 +14,7 @@
+@@ -13,8 +13,8 @@
+
  @interface PanelContentMediator : NSObject
 
- - (instancetype)initWithBroadcaster:(ChromeBroadcaster*)broadcaster
+-- (instancetype)initWithBroadcaster:(ChromeBroadcaster*)broadcaster
 -             initWithToolbarUIState:(ToolbarUIState*)toolbarUIState
++- (instancetype)initWithBroadcaster:(ChromeBroadcaster*)broadcaster
 +                      toolbarUIState:(ToolbarUIState*)toolbarUIState
      NS_DESIGNATED_INITIALIZER;
  - (instancetype)init NS_UNAVAILABLE;
- 
 diff --git a/ios/chrome/browser/contextual_panel/coordinator/panel_content_mediator.mm b/ios/chrome/browser/contextual_panel/coordinator/panel_content_mediator.mm
 index 44c4b55..b14a60e 100644
 --- a/ios/chrome/browser/contextual_panel/coordinator/panel_content_mediator.mm
 +++ b/ios/chrome/browser/contextual_panel/coordinator/panel_content_mediator.mm
-@@ -22,14 +22,14 @@
+@@ -19,14 +19,14 @@
  @implementation PanelContentMediator {
    __weak ChromeBroadcaster* _broadcaster;
    __weak ToolbarUIState* _toolbarUIState;
@@ -96,7 +104,7 @@ index 44c4b55..b14a60e 100644
        _toolbarUIObserverBridge =
            std::make_unique<ToolbarUIObserverBridge>(self);
        _toolbarUIState = toolbarUIState;
-@@ -43,7 +43,7 @@
+@@ -40,7 +40,7 @@
  - (void)setConsumer:(id<PanelContentConsumer>)consumer {
    _consumer = consumer;
 
@@ -109,17 +117,18 @@ diff --git a/ios/chrome/browser/fullscreen/ui_bundled/fullscreen_controller_impl
 index 141d3da..1647ba7 100644
 --- a/ios/chrome/browser/fullscreen/ui_bundled/fullscreen_controller_impl.mm
 +++ b/ios/chrome/browser/fullscreen/ui_bundled/fullscreen_controller_impl.mm
-@@ -34,7 +34,7 @@ FullscreenControllerImpl::FullscreenControllerImpl(Browser* browser)
+@@ -31,7 +31,7 @@ FullscreenControllerImpl::FullscreenControllerImpl(Browser* browser)
        mediator_(browser, this),
-       notification_observer_([[FullscreenSystemNotificationObserver alloc]
-           initWithController:this
-                     mediator:&mediator_]) {
+       notification_observer_(
+           [[FullscreenSystemNotificationObserver alloc]
+              initWithController:this
+                         mediator:&mediator_]) {
 -  ToolbarUIRegistry::GetInstance()->AddObserver(&model_);
-+  // Keep observer registration when IsRefactorToolbarUIEnabled() is used
++  // If using the new observer approach, we still want to ensure the model_ is registered.
    DCHECK(broadcaster_);
    [broadcaster_ addObserver:bridge_
                  forSelector:@selector(broadcastScrollViewContentSize:)];
-@@ -52,14 +52,14 @@ FullscreenControllerImpl::FullscreenControllerImpl(Browser* browser)
+@@ -49,14 +49,14 @@ FullscreenControllerImpl::FullscreenControllerImpl(Browser* browser)
      [broadcaster_ addObserver:bridge_
                    forSelector:@selector(broadcastContentScrollOffset:)];
    }
@@ -136,7 +145,7 @@ index 141d3da..1647ba7 100644
    }
  }
  
-@@ -80,7 +80,7 @@ FullscreenControllerImpl::~FullscreenControllerImpl() {
+@@ -77,7 +77,7 @@ FullscreenControllerImpl::~FullscreenControllerImpl() {
      [broadcaster_ removeObserver:bridge_
                       forSelector:@selector(broadcastContentScrollOffset:)];
    }
@@ -149,50 +158,55 @@ diff --git a/ios/chrome/browser/fullscreen/ui_bundled/fullscreen_model.mm b/ios/
 index 0e4bb43..e8632c7 100644
 --- a/ios/chrome/browser/fullscreen/ui_bundled/fullscreen_model.mm
 +++ b/ios/chrome/browser/fullscreen/ui_bundled/fullscreen_model.mm
-@@ -97,7 +97,7 @@ void FullscreenModel::SetCollapsedTopToolbarHeight(CGFloat height) {
- 
- void FullscreenModel::SetCollapsedTopToolbarHeight(CGFloat height) {
+@@ -94,7 +94,7 @@ void FullscreenModel::SetCollapsedTopToolbarHeight(CGFloat height) {
+   // ...
+ }
+
 -  if (RefactorToolbarUIEnabled()) {
 +  if (IsRefactorToolbarUIEnabled()) {
      return;
    }
    if (AreCGFloatsEqual(GetCollapsedTopToolbarHeight(), height)) {
-@@ -120,7 +120,7 @@ void FullscreenModel::SetExpandedTopToolbarHeight(CGFloat height) {
- 
- void FullscreenModel::SetExpandedTopToolbarHeight(CGFloat height) {
+@@ -117,7 +117,7 @@ void FullscreenModel::SetExpandedTopToolbarHeight(CGFloat height) {
+   // ...
+ }
+
 -  if (RefactorToolbarUIEnabled()) {
 +  if (IsRefactorToolbarUIEnabled()) {
      return;
    }
    if (AreCGFloatsEqual(GetExpandedTopToolbarHeight(), height)) {
-@@ -139,7 +139,7 @@ void FullscreenModel::SetExpandedBottomToolbarHeight(CGFloat height) {
- 
- void FullscreenModel::SetExpandedBottomToolbarHeight(CGFloat height) {
+@@ -136,7 +136,7 @@ void FullscreenModel::SetExpandedBottomToolbarHeight(CGFloat height) {
+   // ...
+ }
+
 -  if (RefactorToolbarUIEnabled()) {
 +  if (IsRefactorToolbarUIEnabled()) {
      return;
    }
    if (AreCGFloatsEqual(expanded_bottom_toolbar_height_, height)) {
-@@ -156,7 +156,7 @@ void FullscreenModel::SetCollapsedBottomToolbarHeight(CGFloat height) {
- 
- void FullscreenModel::SetCollapsedBottomToolbarHeight(CGFloat height) {
+@@ -153,7 +153,7 @@ void FullscreenModel::SetCollapsedBottomToolbarHeight(CGFloat height) {
+   // ...
+ }
+
 -  if (RefactorToolbarUIEnabled()) {
 +  if (IsRefactorToolbarUIEnabled()) {
      return;
    }
    if (AreCGFloatsEqual(collapsed_bottom_toolbar_height_, height)) {
-@@ -590,7 +590,7 @@ void FullscreenModel::OnExpandedBottomToolbarHeightBroadcasted(CGFloat height) {
- 
- void FullscreenModel::OnExpandedBottomToolbarHeightBroadcasted(CGFloat height) {
+@@ -587,7 +587,7 @@ void FullscreenModel::OnExpandedBottomToolbarHeightBroadcasted(CGFloat height) {
+   // ...
+ }
+
 -  if (RefactorToolbarUIEnabled()) {
 +  if (IsRefactorToolbarUIEnabled()) {
      return;
    }
    SetExpandedBottomToolbarHeight(height);
-@@ -610,7 +610,7 @@ void FullscreenModel::OnTopToolbarHeightChanged(CGFloat collapsedHeight,
- 
- void FullscreenModel::OnTopToolbarHeightChanged(CGFloat collapsedHeight,
-                                                 CGFloat expandedHeight) {
+@@ -607,7 +607,7 @@ void FullscreenModel::OnTopToolbarHeightChanged(CGFloat collapsedHeight,
+   // ...
+ }
+
 -  if (RefactorToolbarUIEnabled()) {
 +  if (IsRefactorToolbarUIEnabled()) {
      SetTopToolbarHeight(collapsedHeight, expandedHeight);
@@ -202,7 +216,7 @@ diff --git a/ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbar_ui.h b/ios
 index 1a9ceee..0f1a87b 100644
 --- a/ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbar_ui.h
 +++ b/ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbar_ui.h
-@@ -36,10 +36,10 @@ @interface ToolbarUIState : NSObject
+@@ -33,10 +33,10 @@ @interface ToolbarUIState : NSObject
 
  @property(nonatomic, assign) CGFloat collapsedBottomToolbarHeight;
 
@@ -220,9 +234,20 @@ diff --git a/ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbar_ui.mm b/io
 index 112ccf9..8e7fb75 100644
 --- a/ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbar_ui.mm
 +++ b/ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbar_ui.mm
-@@ -13,36 +13,36 @@ @implementation ToolbarUIState {
+@@ -10,36 +10,36 @@
+ #import "ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbar_ui.h"
+ #import "ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbar_ui_registry.h"
+
+ @implementation ToolbarUIState {
+   CGFloat _collapsedTopToolbarHeight;
+   CGFloat _expandedTopToolbarHeight;
+   CGFloat _expandedBottomToolbarHeight;
+   CGFloat _collapsedBottomToolbarHeight;
  }
 
+ @synthesize collapsedTopToolbarHeight = _collapsedTopToolbarHeight;
+ @synthesize expandedTopToolbarHeight = _expandedTopToolbarHeight;
+ @synthesize expandedBottomToolbarHeight = _expandedBottomToolbarHeight;
  @synthesize collapsedBottomToolbarHeight = _collapsedBottomToolbarHeight;
 
 -- (void)setterCollapsedTopToolbarHeight:(CGFloat)height {
